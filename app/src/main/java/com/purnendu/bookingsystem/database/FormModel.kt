@@ -1,4 +1,4 @@
-package com.purnendu.bookingsystem
+package com.purnendu.bookingsystem.database
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
@@ -15,5 +15,6 @@ data class FormModel( var name:String,
                       var kids:String,
                       var roomPreference:String,
                       var specialRequest:String,
+                      var profileImagePath:String,
                       @PrimaryKey(autoGenerate = true)
                       var id:Long=0)

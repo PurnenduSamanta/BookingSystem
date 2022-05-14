@@ -1,4 +1,4 @@
-package com.purnendu.bookingsystem
+package com.purnendu.bookingsystem.database
 
 import android.content.Context
 import androidx.room.Room

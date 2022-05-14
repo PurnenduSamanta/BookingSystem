@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 
-<layout xmlns:tools="http://schemas.android.com/tools"
+<layout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
@@ -18,6 +18,23 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
 
+
+            <com.mikhaellopez.circularimageview.CircularImageView
+                android:layout_width="150dp"
+                android:layout_height="150dp"
+                app:civ_border_color="#3f51b5"
+                app:civ_border_width="1dp"
+                app:civ_shadow="true"
+                app:civ_shadow_radius="2dp"
+                app:civ_shadow_color="#3f51b5"
+                android:id="@+id/profileImage"
+                android:layout_marginTop="5dp"
+                android:src="@drawable/ic_baseline_add_24"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/ticketId" />
+
+
             <TextView
                 android:id="@+id/nameUser"
                 android:layout_width="0dp"
@@ -26,7 +43,7 @@
                 android:text="Purnendu Samanta"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toBottomOf="@+id/ticketId" />
+                app:layout_constraintTop_toBottomOf="@id/profileImage" />
 
             <TextView
                 android:id="@+id/mailUser"

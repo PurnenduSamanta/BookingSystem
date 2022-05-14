@@ -1,18 +1,21 @@
 package com.purnendu.bookingsystem
 
-import android.content.ClipData.newIntent
+
 import android.content.Context
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import android.widget.Toast
-import androidx.core.content.ContextCompat.startActivity
 import androidx.databinding.DataBindingUtil
 import androidx.databinding.ViewDataBinding
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.mikhaellopez.circularimageview.CircularImageView
+import com.purnendu.bookingsystem.activity.MainActivity
+import com.purnendu.bookingsystem.database.FormModel
+import java.io.File
 
 
 class Adapter(private val context: Context) :
@@ -23,6 +26,7 @@ class Adapter(private val context: Context) :
 
 
         val ticketId: TextView = itemView.findViewById(R.id.ticketId)
+        val profileImage: CircularImageView = itemView.findViewById(R.id.profileImage)
         val name: TextView = itemView.findViewById(R.id.nameUser)
         val email: TextView = itemView.findViewById(R.id.mailUser)
         val phNo: TextView = itemView.findViewById(R.id.phNoUser)
@@ -84,6 +88,12 @@ class Adapter(private val context: Context) :
                 this.roomPreference.text = "RoomType: " + this@outer.roomPreference
                 this.specialRequest.text = this@outer.specialRequest
 
+                val imgFile = File(this@outer.profileImagePath)
+                if (imgFile.exists()) {
+                    val myBitmap = BitmapFactory.decodeFile(imgFile.absolutePath)
+                    this.profileImage.setImageBitmap(myBitmap)
+                }
+
             }
         }
 
@@ -103,10 +113,12 @@ class Adapter(private val context: Context) :
             val kids = getItem(position).kids
             val roomType = getItem(position).roomPreference
             val specialRequest = getItem(position).specialRequest
+            val profileImagePath = getItem(position).profileImagePath
 
 
             intent.putExtra("ID", id)
             intent.putExtra("NAME", name)
+            intent.putExtra("PROFILEIMAGE", profileImagePath)
             intent.putExtra("EMAIL", email)
             intent.putExtra("PHNO", phNo)
             intent.putExtra("ADDRESS", address)
@@ -124,11 +136,5 @@ class Adapter(private val context: Context) :
             context.startActivity(intent)
 
         }
-
-
-    }
-
-    fun getTaskItemId(position: Int): Long {
-        return getItem(position).id
     }
 }
