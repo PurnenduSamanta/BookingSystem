@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.widget.*
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult
 import androidx.appcompat.app.AppCompatActivity
 import androidx.databinding.DataBindingUtil
@@ -39,33 +40,14 @@ class MainActivity : AppCompatActivity() {
     private val country = arrayListOf("India", "China", "Pakistan", "Bangladesh", "USA")
     private val roomType = arrayListOf("A/C", "Non A/C")
 
-    private var myCalendar: Calendar = Calendar.getInstance()
-    private var myCalendar1: Calendar = Calendar.getInstance()
-    private lateinit var dateSetListener: DatePickerDialog.OnDateSetListener
-    private lateinit var dateSetListener1: DatePickerDialog.OnDateSetListener
+    private var checkInCalendar: Calendar = Calendar.getInstance()
+    private var checkOutCalendar: Calendar = Calendar.getInstance()
+    private lateinit var checkInDateSetListener: DatePickerDialog.OnDateSetListener
+    private lateinit var checkOutDateSetListener: DatePickerDialog.OnDateSetListener
 
     private lateinit var database: Database
 
-
-    //opening gallery and selecting image
-    private var someActivityResultLauncher = registerForActivityResult(
-        StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_OK) {
-            val data: Intent? = result.data
-            if (data != null) {
-                val uri: Uri? = data.data
-                val lastPathSegment = uri?.lastPathSegment
-                val bitmap: Bitmap = if (Build.VERSION.SDK_INT < 28) {
-                    MediaStore.Images.Media.getBitmap(this.contentResolver, uri)
-                } else {
-                    val source = uri?.let { ImageDecoder.createSource(this.contentResolver, it) }
-                    source?.let { ImageDecoder.decodeBitmap(it) }!!
-                }
-                CoroutineScope(Dispatchers.Main).launch { setProfileImage(bitmap, lastPathSegment) }
-            }
-        }
-    }
+    private lateinit var someActivityResultLauncher: ActivityResultLauncher<Intent>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,6 +56,7 @@ class MainActivity : AppCompatActivity() {
 
         database = Database.getDataBase(this)
 
+        pickImageFromGallery()
 
         val countryAdapter =
             ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, country)
@@ -84,31 +67,30 @@ class MainActivity : AppCompatActivity() {
             ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, roomType)
         binding.roomPreference.adapter = roomPreferenceAdapter
 
-        fromUpdate()
+        updating()
 
 
-
-        dateSetListener = DatePickerDialog.OnDateSetListener { _, year, month, day ->
-            myCalendar.set(Calendar.YEAR, year)
-            myCalendar.set(Calendar.MONTH, month)
-            myCalendar.set(Calendar.DAY_OF_MONTH, day)
-            updateDateLabel()
+        checkInDateSetListener = DatePickerDialog.OnDateSetListener { _, year, month, day ->
+            checkInCalendar.set(Calendar.YEAR, year)
+            checkInCalendar.set(Calendar.MONTH, month)
+            checkInCalendar.set(Calendar.DAY_OF_MONTH, day)
+            updateCheckInDateLabel()
         }
 
-        dateSetListener1 = DatePickerDialog.OnDateSetListener { _, year, month, day ->
-            myCalendar1.set(Calendar.YEAR, year)
-            myCalendar1.set(Calendar.MONTH, month)
-            myCalendar1.set(Calendar.DAY_OF_MONTH, day)
-            updateDateLabel1()
+        checkOutDateSetListener = DatePickerDialog.OnDateSetListener { _, year, month, day ->
+            checkOutCalendar.set(Calendar.YEAR, year)
+            checkOutCalendar.set(Calendar.MONTH, month)
+            checkOutCalendar.set(Calendar.DAY_OF_MONTH, day)
+            updateCheckoutDateLabel()
         }
 
 
         binding.checkIn.setOnClickListener {
-            openDatePickerDialog()
+            openCheckInDatePickerDialog()
         }
 
         binding.checkOut.setOnClickListener {
-            openDatePickerDialog1()
+            openCheckoutDatePickerDialog()
         }
 
 
@@ -186,6 +168,12 @@ class MainActivity : AppCompatActivity() {
 
 
 
+            if (profileImagePath == "") {
+                Toast.makeText(this@MainActivity, "Please select Profile Photo", Toast.LENGTH_SHORT)
+                    .show()
+                return@setOnClickListener
+            }
+
             if (userName.isEmpty())
                 return@setOnClickListener
 
@@ -215,9 +203,6 @@ class MainActivity : AppCompatActivity() {
             val intent = intent
             val fromWhere = intent.getStringExtra("FROMWHERE")
 
-            if (profileImagePath == "")
-                return@setOnClickListener
-
             if (fromWhere == null) {
                 CoroutineScope(Dispatchers.IO).launch {
                     database.taskDao().insertTask(
@@ -228,8 +213,8 @@ class MainActivity : AppCompatActivity() {
                             userAddress,
                             userCountry,
                             userPin,
-                            myCalendar.time.time,
-                            myCalendar1.time.time,
+                            checkInCalendar.time.time,
+                            checkOutCalendar.time.time,
                             userAdultCounter,
                             userKidsCounter,
                             userRoomPreference,
@@ -243,8 +228,9 @@ class MainActivity : AppCompatActivity() {
 
             } else if (fromWhere == "UPDATE") {
                 val id = intent.getLongExtra("ID", -1)
+                if (id == -1L)
+                    return@setOnClickListener
                 CoroutineScope(Dispatchers.IO).launch {
-
                     database.taskDao().updateData(
                         id,
                         userName,
@@ -254,18 +240,15 @@ class MainActivity : AppCompatActivity() {
                         userAddress,
                         userCountry,
                         userPin,
-                        myCalendar.time.time,
-                        myCalendar1.time.time,
+                        checkInCalendar.time.time,
+                        checkOutCalendar.time.time,
                         userAdultCounter,
                         userKidsCounter,
                         userRoomPreference,
                         userSpecialRequest
                     )
-
-
                 }
                 Toast.makeText(this@MainActivity, "Data Updated", Toast.LENGTH_SHORT).show()
-
             }
 
             binding.apply {
@@ -279,14 +262,40 @@ class MainActivity : AppCompatActivity() {
                 specialRequest.text.clear()
                 profileImage.setImageResource(R.drawable.ic_baseline_add_24)
             }
-
-
+            profileImagePath = ""
         }
 
 
     }
 
-    private fun fromUpdate() {
+
+    private fun pickImageFromGallery() {
+        //opening gallery and selecting image
+        someActivityResultLauncher = registerForActivityResult(StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val data: Intent? = result.data
+                if (data != null) {
+                    val uri: Uri? = data.data
+                    val lastPathSegment = uri?.lastPathSegment
+                    val bitmap: Bitmap = if (Build.VERSION.SDK_INT < 28) {
+                        MediaStore.Images.Media.getBitmap(this.contentResolver, uri)
+                    } else {
+                        val source =
+                            uri?.let { ImageDecoder.createSource(this.contentResolver, it) }
+                        source?.let { ImageDecoder.decodeBitmap(it) }!!
+                    }
+                    CoroutineScope(Dispatchers.Main).launch {
+                        setProfileImage(
+                            bitmap,
+                            lastPathSegment
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun updating() {
 
         val intent = intent
 
@@ -307,10 +316,6 @@ class MainActivity : AppCompatActivity() {
         val selectedCountry = intent.getStringExtra("COUNTRY")
         val preference = intent.getStringExtra("ROOMTYPE")
 
-        if (profileImageV != null) {
-            profileImagePath=profileImageV
-        }
-
         binding.apply {
             name.setText(nameV)
             email.setText(emailV)
@@ -325,13 +330,15 @@ class MainActivity : AppCompatActivity() {
         }
 
 
-        val imgFile = profileImageV?.let { File(it) }
-        if (imgFile != null) {
+        if (profileImageV != null) {
+            profileImagePath = profileImageV
+            val imgFile = File(profileImageV)
             if (imgFile.exists()) {
                 val myBitmap = BitmapFactory.decodeFile(imgFile.absolutePath)
                 binding.profileImage.setImageBitmap(myBitmap)
             }
         }
+
 
         val countryPositionInArray = country.indexOf(selectedCountry)
         val preferencePositionInArray = roomType.indexOf(preference)
@@ -343,36 +350,36 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private fun openDatePickerDialog() {
+    private fun openCheckInDatePickerDialog() {
         val dialog = DatePickerDialog(
             this,
-            dateSetListener,
-            myCalendar.get(Calendar.YEAR),
-            myCalendar.get(Calendar.MONTH),
-            myCalendar.get(Calendar.DAY_OF_MONTH)
+            checkInDateSetListener,
+            checkInCalendar.get(Calendar.YEAR),
+            checkInCalendar.get(Calendar.MONTH),
+            checkInCalendar.get(Calendar.DAY_OF_MONTH)
         )
         dialog.datePicker.minDate = System.currentTimeMillis()
         dialog.show()
     }
 
-    private fun openDatePickerDialog1() {
+    private fun openCheckoutDatePickerDialog() {
         val dialog = DatePickerDialog(
             this,
-            dateSetListener1,
-            myCalendar1.get(Calendar.YEAR),
-            myCalendar1.get(Calendar.MONTH),
-            myCalendar1.get(Calendar.DAY_OF_MONTH)
+            checkOutDateSetListener,
+            checkOutCalendar.get(Calendar.YEAR),
+            checkOutCalendar.get(Calendar.MONTH),
+            checkOutCalendar.get(Calendar.DAY_OF_MONTH)
         )
         dialog.datePicker.minDate = System.currentTimeMillis()
         dialog.show()
     }
 
-    private fun updateDateLabel() {
-        binding.checkIn.setText(TimeFormatter.dateFormat().format(myCalendar.time))
+    private fun updateCheckInDateLabel() {
+        binding.checkIn.setText(TimeFormatter.dateFormat().format(checkInCalendar.time))
     }
 
-    private fun updateDateLabel1() {
-        binding.checkOut.setText(TimeFormatter.dateFormat().format(myCalendar1.time))
+    private fun updateCheckoutDateLabel() {
+        binding.checkOut.setText(TimeFormatter.dateFormat().format(checkOutCalendar.time))
     }
 
     private suspend fun setProfileImage(bitmap: Bitmap, lastPathSegment: String?) {
@@ -394,7 +401,7 @@ class MainActivity : AppCompatActivity() {
         try {
             fos = FileOutputStream(myPath)
             // Use the compress method on the BitMap object to write image to the OutputStream
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos)
+            bitmap.compress(Bitmap.CompressFormat.PNG, 50, fos)
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {

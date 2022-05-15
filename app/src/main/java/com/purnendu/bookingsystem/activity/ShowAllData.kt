@@ -2,6 +2,7 @@ package com.purnendu.bookingsystem.activity
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.purnendu.bookingsystem.Adapter
@@ -30,9 +31,14 @@ class ShowAllData : AppCompatActivity() {
 
 
         database.taskDao().getDetails().observe(this) { outerIt ->
+
+            if(outerIt.isEmpty())
+            {
+                Toast.makeText(this@ShowAllData, "No ticket found", Toast.LENGTH_SHORT).show()
+                return@observe
+            }
             adapter.submitList(outerIt.reversed())
         }
-
 
     }
 }
